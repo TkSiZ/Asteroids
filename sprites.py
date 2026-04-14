@@ -124,6 +124,36 @@ class FrozenAsteroid(Asteroid):
         draw_circle(surf, self.pos, self.r + 3, (40, 160, 200))
 
 
+class SpreadAsteroid(Asteroid):
+    """Amarelo — concede tiro triplo ao ser destruído."""
+    kind = "spread"
+
+    def draw(self, surf: pg.Surface):
+        pts = [(self.pos + p) for p in self.poly]
+        pg.draw.polygon(surf, C.YELLOW, pts, width=2)
+        draw_circle(surf, self.pos, max(4, self.r // 3), C.YELLOW)
+
+    def on_death(self) -> list:
+        return [("spread",)]
+
+
+class TimeAsteroid(Asteroid):
+    """Roxo — congela o tempo dos inimigos ao ser destruído."""
+    kind = "time"
+
+    def draw(self, surf: pg.Surface):
+        pts = [(self.pos + p) for p in self.poly]
+        pg.draw.polygon(surf, (200, 100, 255), pts, width=2) # Cor Roxa
+        # Desenha uma pequena ampulheta minimalista no centro
+        draw_poly(surf, [
+            self.pos + Vec(-4, -4), self.pos + Vec(4, -4),
+            self.pos + Vec(-4, 4),  self.pos + Vec(4, 4)
+        ], C.PURPLE)
+
+    def on_death(self) -> list:
+        return [("freeze_time",)]
+
+
 # ---------------------------------------------------------------------------
 # Nave
 # ---------------------------------------------------------------------------
@@ -152,6 +182,10 @@ class Ship(pg.sprite.Sprite):
         self.combo       = 1
         self.combo_timer = 0.0
 
+        # Timers Powerups
+        self.spread_timer = 0.0
+        self.freeze_timer = 0.0
+
     # ── Controles ─────────────────────────────────────────────────────────
 
     def control(self, keys: pg.key.ScancodeWrapper, dt: float):
@@ -166,14 +200,27 @@ class Ship(pg.sprite.Sprite):
             self.vel += angle_to_vec(self.angle) * C.SHIP_THRUST * dt
         self.vel *= C.SHIP_FRICTION
 
-    def fire(self) -> "Bullet | None":
+
+    def fire(self) -> list["Bullet"]:
         if self.cool > 0:
-            return None
-        dirv      = angle_to_vec(self.angle)
-        pos       = self.pos + dirv * (self.r + 6)
-        vel       = self.vel + dirv * C.SHIP_BULLET_SPEED
+            return []
+        
+        dirv = angle_to_vec(self.angle)
+        pos  = self.pos + dirv * (self.r + 6)
+        vel  = self.vel + dirv * C.SHIP_BULLET_SPEED
         self.cool = C.SHIP_FIRE_RATE
-        return Bullet(pos, vel)
+        
+        bullets = [Bullet(pos, vel)]
+        
+        # Tiro triplo ativo se o timer for maior que 0
+        if self.spread_timer > 0:
+            dir_l = angle_to_vec(self.angle - C.SPREAD_ANGLE)
+            dir_r = angle_to_vec(self.angle + C.SPREAD_ANGLE)
+            
+            bullets.append(Bullet(self.pos + dir_l * (self.r + 6), self.vel + dir_l * C.SHIP_BULLET_SPEED))
+            bullets.append(Bullet(self.pos + dir_r * (self.r + 6), self.vel + dir_r * C.SHIP_BULLET_SPEED))
+            
+        return bullets
 
     def hyperspace(self):
         self.pos    = Vec(uniform(0, C.WIDTH), uniform(0, C.HEIGHT))
@@ -215,6 +262,11 @@ class Ship(pg.sprite.Sprite):
     # ── Update / Draw ──────────────────────────────────────────────────────
 
     def update(self, dt: float):
+        # Timers dos efeitos
+        if self.spread_timer > 0:
+            self.spread_timer -= dt
+        if self.freeze_timer > 0:
+            self.freeze_timer -= dt 
         if self.cool > 0:
             self.cool -= dt
         if self.invuln > 0:
