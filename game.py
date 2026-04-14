@@ -100,8 +100,10 @@ class Game:
         mecanicas = [
             ("🔴 Explosivo — reação em cadeia",    C.RED),
             ("🔵 Congelante — trava os controles", C.CYAN),
-            ("⚡ Combo x1–x6 — mata em sequência", C.YELLOW),
+            ("⚡ Combo x1–x6 — mata em sequência", C.ORANGE),
             ("🛡 Escudo — absorve 1 impacto",       C.CYAN),
+            ("🟡 Metálico — concede tiro triplo",  C.YELLOW),
+            ("🟣 Temporal — para o tempo",         C.PURPLE)
         ]
         y2 = 290
         for txt, col in mecanicas:

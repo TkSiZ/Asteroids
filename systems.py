@@ -8,18 +8,23 @@ import pygame as pg
 
 import config as C
 from sprites import (Asteroid, ExplosiveAsteroid, FrozenAsteroid,
+                     SpreadAsteroid, TimeAsteroid,
                      Ship, UFO, Bullet, UfoBullet)
 from utils import Vec, rand_edge_pos, rand_unit_vec
 
 
 def _make_asteroid(pos: Vec, vel: Vec, size: str) -> Asteroid:
-    """Factory: escolhe normal / explosivo / congelante aleatoriamente."""
+    """Factory: escolhe normal / explosivo / congelante / metálico / temporal aleatoriamente."""
     if size in ("L", "M"):
         roll = random()
         if roll < C.EXPLOSIVE_CHANCE:
             return ExplosiveAsteroid(pos, vel, size)
         elif roll < C.EXPLOSIVE_CHANCE + C.FROZEN_CHANCE:
             return FrozenAsteroid(pos, vel, size)
+        elif roll < C.EXPLOSIVE_CHANCE + C.FROZEN_CHANCE + C.SPREAD_CHANCE:
+            return SpreadAsteroid(pos, vel, size)
+        elif roll < C.EXPLOSIVE_CHANCE + C.FROZEN_CHANCE + C.SPREAD_CHANCE + C.TIME_CHANCE:
+            return TimeAsteroid(pos, vel, size)
     return Asteroid(pos, vel, size)
 
 
@@ -81,8 +86,7 @@ class World:
     def try_fire(self):
         if len(self.bullets) >= C.MAX_BULLETS:
             return
-        b = self.ship.fire()
-        if b:
+        for b in self.ship.fire():
             self.bullets.add(b)
             self.all_sprites.add(b)
 
@@ -106,35 +110,40 @@ class World:
             self.match_over = True
             return
 
-        # Controles da nave
+        # Controles da nave e balas (não são afetados pelo congelamento de tempo)
         self.ship.control(keys, dt)
         self.ship.update(dt)
         if self.safe > 0:
             self.ship.invuln = 0.5
             self.safe -= dt
-
-        # OVNIs
-        if self.ufos:
-            self._ufo_try_fire()
-        else:
-            self.ufo_timer -= dt
-        if not self.ufos and self.ufo_timer <= 0:
-            self._spawn_ufo()
-            self.ufo_timer = C.UFO_SPAWN_EVERY
-
+            
         self.bullets.update(dt)
-        self.ufo_bullets.update(dt)
-        self.asteroids.update(dt)
-        self.ufos.update(dt)
+
+        # LÓGICA DE PARADA NO TEMPO (Apenas para os inimigos)
+        time_is_frozen = self.ship.freeze_timer > 0
+
+        if not time_is_frozen:
+            # OVNIs
+            if self.ufos:
+                self._ufo_try_fire()
+            else:
+                self.ufo_timer -= dt
+            if not self.ufos and self.ufo_timer <= 0:
+                self._spawn_ufo()
+                self.ufo_timer = C.UFO_SPAWN_EVERY
+
+            self.ufo_bullets.update(dt)
+            self.asteroids.update(dt)
+            self.ufos.update(dt)
+
+            # Próxima onda
+            if not self.asteroids and self.wave_cool <= 0:
+                self.start_wave()
+                self.wave_cool = C.WAVE_DELAY
+            elif not self.asteroids:
+                self.wave_cool -= dt
 
         self._handle_collisions()
-
-        # Próxima onda
-        if not self.asteroids and self.wave_cool <= 0:
-            self.start_wave()
-            self.wave_cool = C.WAVE_DELAY
-        elif not self.asteroids:
-            self.wave_cool -= dt
 
         # Tick do efeito de explosão
         if self._blast_fx:
@@ -169,36 +178,38 @@ class World:
 
         # Ameaças vs nave
         if self.ship.invuln <= 0 and self.safe <= 0:
+            
+            # --- Asteroides vs Nave ---
             for ast in list(self.asteroids):
                 if (ast.pos - self.ship.pos).length() < (ast.r + self.ship.r):
                     if ast.kind == "frozen":
                         self.ship.frozen = C.FROZEN_DURATION
+                        # Destrói o asteroide de gelo após o impacto
+                        self._split_asteroid(ast, award=False) 
                     else:
-                        if not self.ship.shield_absorb():
+                        # Se o escudo estiver ativo, absorve e destrói o asteroide
+                        if self.ship.shield_absorb():
+                            self._split_asteroid(ast, award=False)
+                        else:
                             self._ship_die()
                     break
 
+            # --- OVNIs vs Nave ---
             for ufo in list(self.ufos):
                 if (ufo.pos - self.ship.pos).length() < (ufo.r + self.ship.r):
-                    if not self.ship.shield_absorb():
+                    if self.ship.shield_absorb():
+                        # Destrói o OVNI após bater no escudo
+                        ufo.kill()
+                    else:
                         self._ship_die()
                     break
 
+            # --- Balas do OVNI vs Nave ---
             for b in list(self.ufo_bullets):
                 if (b.pos - self.ship.pos).length() < (b.r + self.ship.r):
-                    b.kill()
+                    b.kill() # A bala é sempre destruída ao tocar
                     if not self.ship.shield_absorb():
                         self._ship_die()
-                    break
-
-        # Balas do jogador vs OVNIs
-        for ufo in list(self.ufos):
-            for b in list(self.bullets):
-                if (ufo.pos - b.pos).length() < (ufo.r + b.r):
-                    pts = C.UFO_SMALL["score"] if ufo.small else C.UFO_BIG["score"]
-                    self.score += pts
-                    ufo.kill()
-                    b.kill()
                     break
 
     def _split_asteroid(self, ast: Asteroid, award: bool = True,
@@ -223,11 +234,15 @@ class World:
         # Mata ANTES de propagar o blast
         ast.kill()
 
-        # Efeitos on_death (explosivo)
+        # Efeitos on_death (explosivo e powerups)
         for event in ast.on_death():
             if event[0] == "blast":
                 _, blast_pos, blast_r = event
                 self._apply_blast(blast_pos, blast_r, _visited)
+            elif event[0] == "spread":
+                self.ship.spread_timer = C.SPREAD_DUR
+            elif event[0] == "freeze_time":
+                self.ship.freeze_timer = C.FREEZE_DUR
 
         # Fragmentos
         for s in split_list:
@@ -310,8 +325,22 @@ class World:
         lbl = font.render("ESCUDO [S]", True, C.GRAY)
         surf.blit(lbl, (bx + bw + 6, by - 2))
 
+        y_hud = 72
+
         # ── Indicador de combo ────────────────────────────────────────────
         if self.ship.combo > 1:
             col = C.ORANGE if self.ship.combo >= 4 else C.YELLOW
             cs  = font.render(f"x{self.ship.combo} COMBO!", True, col)
-            surf.blit(cs, (10, 72))
+            surf.blit(cs, (10, y_hud))
+            y_hud += 20
+            
+        # ── Timer Tiro Triplo ────────────────────────────────────────────
+        if self.ship.spread_timer > 0:
+            lbl = font.render(f"TIRO TRIPLO: {self.ship.spread_timer:.1f}s", True, C.YELLOW)
+            surf.blit(lbl, (10, y_hud))
+            y_hud += 20
+            
+        # ── Timer Tempo Parado ────────────────────────────────────────────
+        if self.ship.freeze_timer > 0:
+            lbl = font.render(f"TEMPO PARADO: {self.ship.freeze_timer:.1f}s", True, (200, 100, 255))
+            surf.blit(lbl, (10, y_hud))
