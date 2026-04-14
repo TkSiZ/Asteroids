@@ -81,45 +81,57 @@ class Game:
     # ── Telas ─────────────────────────────────────────────────────────────────
 
     def _draw_menu(self):
-        text_center(self.screen, self.big,  "ASTEROIDES",  C.WIDTH // 2, 150)
-        text_center(self.screen, self.med,  "v 2.0",       C.WIDTH // 2, 210, C.GRAY)
+        text_center(self.screen, self.big,  "ASTEROIDES",  C.WIDTH // 2, 120)
+        text_center(self.screen, self.med,  "v 2.0",       C.WIDTH // 2, 185, C.GRAY)
+        text_center(self.screen, self.font,
+                    "Pressione qualquer tecla para jogar",
+                    C.WIDTH // 2, 235, C.WHITE)
 
-        linhas = [
-            ("Pressione qualquer tecla para jogar", C.WHITE),
-            ("", C.BLACK),
-            ("<- ->   virar        ↑   acelerar", C.GRAY),
-            ("ESPAÇO   atirar     S   escudo",   C.GRAY),
-            ("SHIFT   hiperespaço  ESC   sair",  C.GRAY),
+        # ── Controles ────────────────────────────────────────────────────────
+        controles_titulo = self.font.render("CONTROLES", True, C.WHITE)
+        self.screen.blit(controles_titulo, (40, 285))
+
+        controles = [
+            ("<-  ->    Virar",       C.GRAY),
+            ("[^]       Acelerar",    C.GRAY),
+            ("ESPACO    Atirar",      C.GRAY),
+            ("S         Escudo",      C.GRAY),
+            ("SHIFT     Hiperespaco", C.GRAY),
+            ("ESC       Sair/Menu",   C.GRAY),
         ]
-        y = 290
-        for txt, col in linhas:
-            text_center(self.screen, self.font, txt, C.WIDTH // 2, y, col)
-            y += 30
+        y = 315
+        for txt, col in controles:
+            lbl = self.font.render(txt, True, col)
+            self.screen.blit(lbl, (40, y))
+            y += 28
 
-        # Legenda das mecânicas
+        # ── Mecânicas ─────────────────────────────────────────────────────────
+        mec_titulo = self.font.render("MECANICAS ESPECIAIS", True, C.WHITE)
+        self.screen.blit(mec_titulo, (C.WIDTH - mec_titulo.get_width() - 40, 285))
+
         mecanicas = [
-            ("🔴 Explosivo — reação em cadeia",    C.RED),
-            ("🔵 Congelante — trava os controles", C.CYAN),
-            ("⚡ Combo x1–x6 — mata em sequência", C.ORANGE),
-            ("🛡 Escudo — absorve 1 impacto",       C.CYAN),
-            ("🟡 Metálico — concede tiro triplo",  C.YELLOW),
-            ("🟣 Temporal — para o tempo",         C.PURPLE)
+            ("[EXP] Explosivo  — reacao em cadeia",    C.RED),
+            ("[GEL] Congelante — trava os controles",  C.CYAN),
+            ("[CMB] Combo x1-x6 — mata em sequencia",  C.ORANGE),
+            ("[ESC] Escudo     — absorve 1 impacto",   C.CYAN),
+            ("[MET] Metalico   — tiro triplo",         C.YELLOW),
+            ("[TMP] Temporal   — para o tempo",        C.PURPLE),
         ]
-        y2 = 290
+        y2 = 315
         for txt, col in mecanicas:
             lbl = self.font.render(txt, True, col)
-            self.screen.blit(lbl, (C.WIDTH - lbl.get_width() - 20, y2))
-            y2 += 30
+            self.screen.blit(lbl, (C.WIDTH - lbl.get_width() - 40, y2))
+            y2 += 28
 
     def _draw_over(self):
         text_center(self.screen, self.big,
-                    "FIM DE JOGO", C.WIDTH // 2, 200)
+                    "FIM DE JOGO", C.WIDTH // 2, 180)
         text_center(self.screen, self.med,
-                    f"PONTUAÇÃO FINAL:  {self.world.score:06d}",
-                    C.WIDTH // 2, 290, C.WHITE)
-        text_center(self.screen, self.font,
-                    "Pressione qualquer tecla para voltar ao menu",
-                    C.WIDTH // 2, C.HEIGHT - 70, C.GRAY)
+                    f"PONTUACAO FINAL:  {self.world.score:06d}",
+                    C.WIDTH // 2, 270, C.WHITE)
         text_center(self.screen, self.font,
                     "Pressione 'R' para reiniciar a partida",
-                    C.WIDTH // 2, C.HEIGHT - 90, C.GRAY)
+                    C.WIDTH // 2, C.HEIGHT - 90, C.WHITE)
+        text_center(self.screen, self.font,
+                    "Pressione qualquer outra tecla para voltar ao menu",
+                    C.WIDTH // 2, C.HEIGHT - 60, C.GRAY)
