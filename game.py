@@ -110,12 +110,12 @@ class Game:
         self.screen.blit(mec_titulo, (C.WIDTH - mec_titulo.get_width() - 40, 285))
 
         mecanicas = [
-            ("[EXP] Explosivo  — reacao em cadeia",    C.RED),
-            ("[GEL] Congelante — trava os controles",  C.CYAN),
-            ("[CMB] Combo x1-x6 — mata em sequencia",  C.ORANGE),
-            ("[ESC] Escudo     — absorve 1 impacto",   C.CYAN),
-            ("[MET] Metalico   — tiro triplo",         C.YELLOW),
-            ("[TMP] Temporal   — para o tempo",        C.PURPLE),
+            (" Explosivo  — reacao em cadeia",    C.RED),
+            (" Congelante — trava os controles",  C.CYAN),
+            (" Combo x1-x6 — mata em sequencia",  C.ORANGE),
+            (" Escudo     — absorve 1 impacto",   C.CYAN),
+            (" Metalico   — tiro triplo",         C.YELLOW),
+            (" Temporal   — para o tempo",        C.PURPLE),
         ]
         y2 = 315
         for txt, col in mecanicas:
